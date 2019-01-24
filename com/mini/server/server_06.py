@@ -1,18 +1,18 @@
 # --*--coding:utf-8
 # Author:cnn
-import socket
 import multiprocessing
-import re
 import os
-import time
-from com.mini.server import mini_frame_wsgi
+import re
+import socket
+
+from com.mini.dynamic import mini_frame_wsgi_dict
 
 CRLF = "\r\n"
-OBJECT_PATH = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(__file__))))
-
+#OBJECT_PATH = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(__file__))))
+OBJECT_PATH=os.path.dirname(os.path.dirname(__file__))
 
 class Server(object):
-    """多进程面向对象服务器,加动态请求资源,支持wsgi"""
+    """通过传递字典验证请求不一样,响应不同页面"""
 
     def __init__(self):
         """初始化"""
@@ -79,14 +79,14 @@ class Server(object):
                 # 判断文件名是否以.py结尾,不是返回静态页面,是返回动态页面
                 if not file_name.endswith(".py"):
                     try:
-                        file = open(OBJECT_PATH + "/htmls" + file_name, "rb")
+                        file = open(OBJECT_PATH + "/templates" + file_name, "rb")
                     except:
                         response_404 = "HTTP/1.1 404 NOT FOUND" + CRLF
                         response_404 += "Content-Type:text/html;charset=utf-8" + CRLF
                         response_404 += CRLF
                         request_socket.send(response_404.encode("utf8"))
                         try:
-                            file_404 = open(OBJECT_PATH + "/htmls/404.html", "rb")
+                            file_404 = open(OBJECT_PATH + "/templates/404.html", "rb")
                             content_404 = file_404.read()
                             request_socket.send(content_404)
                         except:
@@ -104,7 +104,9 @@ class Server(object):
                         file.close()
                 else:
                     response_dict=dict()
-                    response_body=mini_frame_wsgi.application(response_dict,self.set_response_body)
+                    #字典的value为请求路径的/index.py
+                    response_dict["path_info"]=file_name
+                    response_body= mini_frame_wsgi_dict.application(response_dict, self.set_response_body)
                     headers="HTTP/1.1 %s"%self.status+CRLF
                     for temp in self.headers:
                         headers+="%s:%s"%(temp[0],temp[1])+CRLF

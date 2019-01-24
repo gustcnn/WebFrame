@@ -1,26 +1,29 @@
 # --*--coding:utf-8
 # Author:cnn
-import socket
 import multiprocessing
-import re
 import os
-import time
-from com.mini.server import mini_frame_wsgi
+import re
+import socket
+import sys
+
+from com.mini.dynamic import mini_frame_wsgi_dict
 
 CRLF = "\r\n"
-OBJECT_PATH = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(__file__))))
+# OBJECT_PATH = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(__file__))))
+OBJECT_PATH = os.path.dirname(os.path.dirname(__file__))
 
 
 class Server(object):
-    """多进程面向对象服务器,加动态请求资源,支持wsgi"""
+    """通过传递字典验证请求不一样,响应不同页面"""
 
-    def __init__(self):
+    def __init__(self, port):
         """初始化"""
+
         # 创建套接字
         self.server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.server_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         # 绑定ip
-        self.server_socket.bind(("127.0.0.1", 9000))
+        self.server_socket.bind(("127.0.0.1", port))
         # 监听
         self.server_socket.listen()
 
@@ -43,16 +46,17 @@ class Server(object):
         """关闭监听套接字"""
         if self.server_socket is not None:
             self.server_socket.close()
-    def set_response_body(self,status,headers):
+
+    def set_response_body(self, status, headers):
         """
         设置响应头
         :param status: 响应状态码
         :param headers: 响应头
         :return:
         """
-        self.status=status
-        self.headers=[("Server","nginx_mini_web")]
-        self.headers+=headers
+        self.status = status
+        self.headers = [("Server", "nginx_mini_web")]
+        self.headers += headers
 
     def service_client(self, request_socket):
         """处理客户端请求"""
@@ -61,32 +65,32 @@ class Server(object):
         # 获得请求头的第一行,即GET HTTP/1.1 200 OK
         recv_data_list = recv_data.splitlines()
         # print(recv_data_list)
-        #请求头不为空则有请求
+        # 请求头不为空则有请求
         if len(recv_data_list) != 0:
-            #获得请求头
+            # 获得请求头
             recv_data_get = recv_data_list[0]
             # re_html = r"[^/]+(/[^ ]*)"
-            #匹配/index.html等
+            # 匹配/index.html等
             re_html = r"[\w ]*(/[^ ]*)"
             re_html_result = re.match(re_html, recv_data_get)
             file_name = None
             # 判断正则匹配结果,匹配到了,获得匹配的值,如果浏览器输入/则默认返回index.html
             if re_html_result:
-                #获得/index.html等
+                # 获得/index.html等
                 file_name = re_html_result.group(1)
                 if file_name == "/":
                     file_name = "/index.html"
                 # 判断文件名是否以.py结尾,不是返回静态页面,是返回动态页面
                 if not file_name.endswith(".py"):
                     try:
-                        file = open(OBJECT_PATH + "/htmls" + file_name, "rb")
+                        file = open(OBJECT_PATH + "/templates" + file_name, "rb")
                     except:
                         response_404 = "HTTP/1.1 404 NOT FOUND" + CRLF
                         response_404 += "Content-Type:text/html;charset=utf-8" + CRLF
                         response_404 += CRLF
                         request_socket.send(response_404.encode("utf8"))
                         try:
-                            file_404 = open(OBJECT_PATH + "/htmls/404.html", "rb")
+                            file_404 = open(OBJECT_PATH + "/templates/404.html", "rb")
                             content_404 = file_404.read()
                             request_socket.send(content_404)
                         except:
@@ -103,19 +107,33 @@ class Server(object):
                         request_socket.send(html_content)
                         file.close()
                 else:
-                    response_dict=dict()
-                    response_body=mini_frame_wsgi.application(response_dict,self.set_response_body)
-                    headers="HTTP/1.1 %s"%self.status+CRLF
+                    response_dict = dict()
+                    # 字典的value为请求路径的/index.py
+                    response_dict["path_info"] = file_name
+                    response_body = mini_frame_wsgi_dict.application(response_dict, self.set_response_body)
+                    headers = "HTTP/1.1 %s" % self.status + CRLF
                     for temp in self.headers:
-                        headers+="%s:%s"%(temp[0],temp[1])+CRLF
-                    headers+=CRLF
-                    response=headers+response_body
+                        headers += "%s:%s" % (temp[0], temp[1]) + CRLF
+                    headers += CRLF
+                    response = headers + response_body
                     request_socket.send(response.encode("utf8"))
         request_socket.close()
 
+
 def main():
     """控制整体,创建一个对象,调用循环方法"""
-    server = Server()
+    args_list = sys.argv
+    if len(args_list) < 2:
+        print("输入格式如 python ***.py 7890")
+        return
+    else:
+        try:
+            port = sys.argv[1]
+        except Exception as e:
+            print("端口错误.")
+            return
+
+    server = Server(port)
     server.run_forever()
 
 
