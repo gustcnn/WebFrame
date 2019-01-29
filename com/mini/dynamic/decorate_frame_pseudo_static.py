@@ -27,22 +27,8 @@ def route(path):
 def center():
     with open(path + "/templates/center.html", encoding="utf8") as f:
         content = f.read()
-    return content
-
-#TODO
-@route("/index.html")
-def index():
-    with open(path + "/templates/index.html", encoding='UTF-8') as f:
-        content= f.read()
-    # 创建Connection连接
-    conn = pymysql.connect(host='localhost', port=3306, user='root', password='root', database='stock_db', charset='utf8')
-    # 获得Cursor对象
-    cs = conn.cursor()
-    cs.execute("select i.code,i.short,i.chg,i.turnover,i.price,i.highs,f.note_info from info as i inner join focus as f on i.id=f.info_id;")
-    stock_infos = cs.fetchall()
-    cs.close()
-    conn.close()
-
+    mysql = ConnMysql()
+    stock_infos = mysql.execute_myql("select * from info;")
     tr_template = """
         <tr>
             <td>%s</td>
@@ -53,23 +39,52 @@ def index():
             <td>%s</td>
             <td>%s</td>
             <td>
-                <a type="button" class="btn btn-default btn-xs" href="/update/%s.html"> <span class="glyphicon glyphicon-star" aria-hidden="true"></span> 修改 </a>
+                <a type="button" class="btn btn-default btn-xs" href="/update/300268.html"> <span class="glyphicon glyphicon-star" aria-hidden="true"></span> 修改 </a>
             </td>
             <td>
-                <input type="button" value="删除" id="toDel" name="toDel" systemidvaule="%s">
+                <input type="button" value="删除" id="toDel" name="toDel" systemidvaule="300268">
             </td>
         </tr>
     """
 
     html = ""
     for line_info in stock_infos:
-        html += tr_template % (line_info[0],line_info[1],line_info[2],line_info[3],line_info[4],line_info[5],line_info[6], line_info[0], line_info[0])
-    #print("html",html)
-    # content = re.sub(r"\{%content%\}", str(stock_infos), content)
-    # content_html = re.sub(r"([^_\/\.]+)*\{%content%\}([^_\/\.]+)*",html,content)
-    # print(content_html)
-    return html
+        html += tr_template % (line_info[0],line_info[1],line_info[2],line_info[3],line_info[4],line_info[5],line_info[6])
 
+    # content = re.sub(r"\{%content%\}", str(stock_infos), content)
+    content = re.sub(r"{[^}]+}", html, content)
+    return content
+
+@route("/index.html")
+def index():
+    with open(path+"/templates/index.html",encoding='UTF-8') as f:
+        content = f.read()
+    mysql=ConnMysql()
+    stock_infos=mysql.execute_myql("select * from info;")
+    print(stock_infos)
+    tr_template = """<tr>
+        <td>%s</td>
+        <td>%s</td>
+        <td>%s</td>
+        <td>%s</td>
+        <td>%s</td>
+        <td>%s</td>
+        <td>%s</td>
+        <td>%s</td>
+        <td>
+            <input type="button" value="添加" id="toAdd" name="toAdd" systemidvaule="000007">
+        </td>
+        </tr>
+    """
+
+    html = ""
+    for line_info in stock_infos:
+        html += tr_template % (line_info[0],line_info[1],line_info[2],line_info[3],line_info[4],line_info[5],line_info[6],line_info[7])
+
+    #re_str=r"{[^}]+}" 匹配{%content%}里面的内容
+    content = re.sub(r"{[^}]+}", html, content)
+
+    return content
 
 def application(envion, func_p):
     """
